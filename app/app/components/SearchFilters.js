@@ -1,9 +1,11 @@
 "use client";
 
-import { Input, Select, Space, Button, Typography } from "antd";
-import { SearchOutlined, CloseCircleOutlined } from "@ant-design/icons";
+import { Input, Select, Button, Flex, Tag, Typography } from "antd";
+import { SearchOutlined, CloseOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
+
+const MONO = '"SF Mono", "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono", monospace';
 
 const statusOptions = [
   { value: "ok", label: "OK" },
@@ -12,9 +14,11 @@ const statusOptions = [
 ];
 
 const labelStyle = {
-  fontSize: 12,
-  color: "#64748b",
-  fontWeight: 500,
+  fontFamily: MONO,
+  fontSize: 10.5,
+  letterSpacing: "0.09em",
+  textTransform: "uppercase",
+  color: "#8b8f9c",
   whiteSpace: "nowrap",
 };
 
@@ -29,81 +33,115 @@ const SearchFilters = ({
   onClearFilters,
 }) => {
   const agentOptions = agents.map((a) => ({ value: a, label: a }));
-  const hasActiveFilters = agent || status;
+  const hasActiveFilters = Boolean(agent || status);
 
   return (
-    <Space
-      wrap
-      align="center"
-      size={12}
+    <Flex
+      vertical
+      gap={8}
       style={{
-        display: "flex",
         width: "100%",
         background: "#ffffff",
-        border: "1px solid #e3e8ef",
-        borderRadius: 8,
+        border: "1px solid #e5e4de",
+        borderRadius: 10,
         padding: "10px 12px",
-        boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-        justifyContent: "space-between",
       }}
     >
-      <Space size={16} align="center" wrap style={{ flex: "1 1 380px", minWidth: 0 }}>
-        <label htmlFor="search-input" style={{ ...labelStyle, display: "flex", alignItems: "center" }}>
-          Search
-        </label>
-        <Input.Search
-          id="search-input"
-          placeholder="Search tool calls… (agent, tool, args)"
-          value={q}
-          allowClear
-          enterButton
-          prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
-          onChange={(e) => onSearch?.(e.target.value)}
-          onSearch={onSearch}
-          style={{ flex: "1 1 260px", minWidth: 180, maxWidth: 480 }}
-        />
-      </Space>
+      <Flex align="center" gap={12} wrap style={{ width: "100%" }}>
+        <Flex align="center" gap={8} style={{ flex: "1 1 300px", minWidth: 0 }}>
+          <span id="aa-search-label" style={labelStyle}>
+            Search
+          </span>
+          <Input.Search
+            aria-labelledby="aa-search-label"
+            placeholder="Tool, agent or argument…"
+            value={q}
+            allowClear
+            prefix={<SearchOutlined style={{ color: "#a9adb8" }} />}
+            onChange={(e) => onSearch?.(e.target.value)}
+            onSearch={onSearch}
+            style={{ flex: 1, maxWidth: 460, minWidth: 160 }}
+          />
+        </Flex>
 
-      <Space size={8} align="center" wrap>
-        <label htmlFor="agent-filter" style={{ ...labelStyle, display: "flex", alignItems: "center" }}>
-          Agent
-        </label>
-        <Select
-          id="agent-filter"
-          placeholder="All agents"
-          value={agent || undefined}
-          style={{ width: 160 }}
-          onChange={onAgentChange}
-          allowClear
-          options={agentOptions}
-        />
+        <Flex align="center" gap={10} wrap style={{ marginLeft: "auto" }}>
+          <Flex align="center" gap={8}>
+            <span id="aa-agent-label" style={labelStyle}>
+              Agent
+            </span>
+            <Select
+              aria-labelledby="aa-agent-label"
+              placeholder="All agents"
+              value={agent || undefined}
+              style={{ width: 170 }}
+              onChange={onAgentChange}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              options={agentOptions}
+            />
+          </Flex>
 
-        <label htmlFor="status-filter" style={{ ...labelStyle, display: "flex", alignItems: "center" }}>
-          Status
-        </label>
-        <Select
-          id="status-filter"
-          placeholder="All statuses"
-          value={status || undefined}
-          style={{ width: 130 }}
-          onChange={onStatusChange}
-          allowClear
-          options={statusOptions}
-        />
+          <Flex align="center" gap={8}>
+            <span id="aa-status-label" style={labelStyle}>
+              Status
+            </span>
+            <Select
+              aria-labelledby="aa-status-label"
+              placeholder="All statuses"
+              value={status || undefined}
+              style={{ width: 140 }}
+              onChange={onStatusChange}
+              allowClear
+              options={statusOptions}
+            />
+          </Flex>
+        </Flex>
+      </Flex>
 
-        {hasActiveFilters && (
-          <Button
-            type="text"
-            size="small"
-            icon={<CloseCircleOutlined />}
-            onClick={onClearFilters}
-            style={{ color: "#64748b" }}
-          >
-            Clear
+      {hasActiveFilters && (
+        <Flex align="center" gap={6} wrap style={{ paddingTop: 8, borderTop: "1px solid #edece7" }}>
+          <Text style={{ ...labelStyle, color: "#6b7080" }}>Active</Text>
+          {agent && (
+            <Tag
+              closable
+              onClose={() => onAgentChange?.("")}
+              closeIcon={<CloseOutlined style={{ fontSize: 9 }} />}
+              style={{
+                marginInlineEnd: 0,
+                background: "#eef1fe",
+                border: "1px solid #d5ddfb",
+                color: "#2743c4",
+                fontFamily: MONO,
+                fontSize: 11.5,
+              }}
+            >
+              agent: {agent}
+            </Tag>
+          )}
+          {status && (
+            <Tag
+              closable
+              onClose={() => onStatusChange?.("")}
+              closeIcon={<CloseOutlined style={{ fontSize: 9 }} />}
+              style={{
+                marginInlineEnd: 0,
+                background: "#efeee9",
+                border: "1px solid #dedcd3",
+                color: "#4b4f5c",
+                fontFamily: MONO,
+                fontSize: 11.5,
+              }}
+            >
+              status: {status}
+            </Tag>
+          )}
+          <Button type="link" size="small" onClick={onClearFilters} style={{ paddingInline: 4 }}>
+            Clear all
           </Button>
-        )}
-      </Space>
-    </Space>
+        </Flex>
+      )}
+    </Flex>
   );
 };
 

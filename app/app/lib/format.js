@@ -14,6 +14,22 @@ export function formatTimestamp(isoString) {
   });
 }
 
+// Split into a compact date and a precision clock so tables can typeset each part.
+export function formatTimestampParts(isoString) {
+  if (!isoString) return { date: "—", time: "" };
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return { date: isoString, time: "" };
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = date.toLocaleString(undefined, { month: "short" });
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  const ms = String(date.getMilliseconds()).padStart(3, "0");
+
+  return { date: `${day} ${month}`, time: `${hh}:${mm}:${ss}.${ms}` };
+}
+
 export function formatRelativeTime(isoString) {
   if (!isoString) return "—";
   const date = new Date(isoString);

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Layout, Card, Alert, Button, Flex, Statistic, App } from "antd";
+import { Layout, Alert, Button, App, Grid } from "antd";
 import { ReloadOutlined, ExclamationCircleOutlined, WifiOutlined } from "@ant-design/icons";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 import HeaderBar from "./HeaderBar";
+import Hero from "./Hero";
 import PageHeader from "./PageHeader";
 import SearchFilters from "./SearchFilters";
 import EventTable from "./EventTable";
@@ -19,47 +20,13 @@ const SLOW_NETWORK_THRESHOLD = 2000;
 const DEFAULT_PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
 
-const MONO = '"SF Mono", "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono", monospace';
-
 const surfaceStyle = {
   background: "#ffffff",
-  border: "1px solid #e3e8ef",
-  boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
+  border: "1px solid #e5e4de",
+  boxShadow: "0 1px 2px rgba(17, 23, 38, 0.04)",
+  borderRadius: 10,
+  overflow: "hidden",
 };
-
-const SummaryTile = ({ label, value, valueColor = "#0f172a" }) => (
-  <Card
-    size="small"
-    style={{ flex: "1 1 136px", minWidth: 124, borderRadius: 8, ...surfaceStyle }}
-    styles={{ body: { padding: "8px 14px" } }}
-  >
-    <Statistic
-      title={
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            color: "#94a3b8",
-          }}
-        >
-          {label}
-        </span>
-      }
-      value={value}
-      styles={{
-        content: {
-          fontSize: 18,
-          fontWeight: 650,
-          lineHeight: "24px",
-          color: valueColor,
-          fontFamily: MONO,
-        },
-      }}
-    />
-  </Card>
-);
 
 const EventExplorer = () => {
   const { message: apiMessage } = App.useApp();
@@ -90,6 +57,11 @@ const EventExplorer = () => {
   const initializedRef = useRef(false);
   const debounceTimerRef = useRef(null);
   const pendingSearchRef = useRef(null);
+
+  // The app shell is a fixed viewport with an internally scrolling table on
+  // tablet and up; on narrow screens the document scrolls instead.
+  const screens = Grid.useBreakpoint();
+  const fixedShell = screens.md ?? true;
 
   const q = searchParams.get("q") || "";
   const agent = searchParams.get("agent") || "";
@@ -183,29 +155,26 @@ const EventExplorer = () => {
     [pageSize, events, q, agent, status, apiMessage]
   );
 
-  const fetchEventDetail = useCallback(
-    async (eventId) => {
-      if (detailAbortControllerRef.current) {
-        detailAbortControllerRef.current.abort();
-      }
-      detailAbortControllerRef.current = new AbortController();
+  const fetchEventDetail = useCallback(async (eventId) => {
+    if (detailAbortControllerRef.current) {
+      detailAbortControllerRef.current.abort();
+    }
+    detailAbortControllerRef.current = new AbortController();
 
-      setDetailLoading(true);
-      setDetailError(null);
+    setDetailLoading(true);
+    setDetailError(null);
 
-      try {
-        const data = await api.getEvent(eventId);
-        setDetailEvent(data);
-      } catch (err) {
-        if (err.name === "AbortError") return;
-        setDetailError(err);
-        setDetailEvent(null);
-      } finally {
-        setDetailLoading(false);
-      }
-    },
-    []
-  );
+    try {
+      const data = await api.getEvent(eventId);
+      setDetailEvent(data);
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      setDetailError(err);
+      setDetailEvent(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
 
   const loadNextPage = useCallback(() => {
     if (hasNextPage && nextCursor && !loading) {
@@ -231,11 +200,14 @@ const EventExplorer = () => {
     fetchEvents({ page: 1, limit: pageSize, append: false });
   }, [fetchEvents, pageSize]);
 
-  const handleRowClick = useCallback((record) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("event", record.id);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [searchParams, router, pathname]);
+  const handleRowClick = useCallback(
+    (record) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("event", record.id);
+      router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [searchParams, router, pathname]
+  );
 
   const closeDetail = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -350,24 +322,84 @@ const EventExplorer = () => {
   }, {});
   const uniqueAgents = new Set(events.map((ev) => ev?.agent).filter(Boolean)).size;
 
+  // Derived, real values only — nothing here is fabricated for the hero.
+  const latencies = events
+    .map((ev) => ev?.latencyMs)
+    .filter((v) => typeof v === "number")
+    .sort((a, b) => a - b);
+  const medianLatency = latencies.length ? latencies[Math.floor(latencies.length / 2)] : null;
+
+  const toolCounts = events.reduce((acc, ev) => {
+    if (ev?.tool) acc[ev.tool] = (acc[ev.tool] || 0) + 1;
+    return acc;
+  }, {});
+  const toolNodes = Object.entries(toolCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name]) => name);
+  // If the agents endpoint is unavailable, fall back to the agents seen in the loaded window.
+  const observedAgents = [...new Set(events.map((ev) => ev?.agent).filter(Boolean))];
+  const agentFleet = agents.length ? agents : observedAgents;
+  const agentNodes = agentFleet.slice(0, 3);
+
+  const hasActiveFilters = Boolean(agent || status);
+  const activeFilterLabel =
+    [agent ? `agent: ${agent}` : null, status ? `status: ${status}` : null]
+      .filter(Boolean)
+      .join(" · ") || "all agents · all statuses";
+
   return (
-    <Layout style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f4f6f9" }}>
+    <Layout
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        background: "#f6f6f3",
+        ...(fixedShell ? { height: "100vh", overflow: "hidden" } : null),
+      }}
+    >
       <HeaderBar connection={connection} />
-      <Content style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+      <Hero
+        loading={initialLoad}
+        totalEvents={total}
+        agentCount={agentFleet.length}
+        loadedCount={events.length}
+        medianLatency={medianLatency}
+        agentNodes={agentNodes}
+        toolNodes={toolNodes}
+      />
+
+      <Content
+        style={{
+          flex: fixedShell ? 1 : "none",
+          display: "flex",
+          flexDirection: "column",
+          overflow: fixedShell ? "hidden" : "visible",
+          minHeight: 0,
+        }}
+      >
         <div
           style={{
             maxWidth: 1400,
             margin: "0 auto",
-            padding: "16px 24px",
+            padding: "18px 24px 22px",
             width: "100%",
-            flex: 1,
+            flex: fixedShell ? 1 : "none",
             display: "flex",
             flexDirection: "column",
             minHeight: 0,
-            gap: 14,
+            gap: 12,
           }}
         >
-          <PageHeader totalEvents={total} />
+          <PageHeader
+            totalEvents={total}
+            loadedCount={events.length}
+            statusCounts={statusCounts}
+            uniqueAgents={uniqueAgents}
+            hasActiveFilters={hasActiveFilters}
+            activeFilterLabel={activeFilterLabel}
+          />
 
           <SearchFilters
             agents={agents}
@@ -379,16 +411,6 @@ const EventExplorer = () => {
             onStatusChange={handleStatusChange}
             onClearFilters={handleClearFilters}
           />
-
-          {!initialLoad && (
-            <Flex gap={12} wrap>
-              <SummaryTile label="Loaded" value={events.length} />
-              <SummaryTile label="OK" value={statusCounts.ok || 0} valueColor="#15803d" />
-              <SummaryTile label="Blocked" value={statusCounts.blocked || 0} valueColor="#b45309" />
-              <SummaryTile label="Error" value={statusCounts.error || 0} valueColor="#b91c1c" />
-              <SummaryTile label="Agents" value={uniqueAgents} />
-            </Flex>
-          )}
 
           {slowNetwork && !loading && (
             <Alert
@@ -436,23 +458,23 @@ const EventExplorer = () => {
             />
           )}
 
-          <Card
+          <div
             style={{
               ...surfaceStyle,
-              flex: 1,
+              flex: fixedShell ? 1 : "none",
               display: "flex",
               flexDirection: "column",
               minHeight: 0,
-              borderRadius: 8,
-              overflow: "hidden",
             }}
-            styles={{ body: { flex: 1, minHeight: 0, padding: 0, display: "flex", flexDirection: "column" } }}
           >
             <EventTable
               data={events}
               loading={loading}
               onRowClick={handleRowClick}
               selectedRowKey={selectedEvent?.id}
+              hasFilters={Boolean(q || agent || status)}
+              hasError={Boolean(error) && !loading && events.length === 0}
+              fixedHeight={fixedShell}
             />
 
             {events.length > 0 && (
@@ -468,9 +490,10 @@ const EventExplorer = () => {
                 showSizeChanger={true}
               />
             )}
-          </Card>
+          </div>
         </div>
       </Content>
+
       <EventDetailDrawer
         open={!!eventIdFromUrl}
         event={detailEvent}

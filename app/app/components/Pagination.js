@@ -1,8 +1,13 @@
 "use client";
 
-import { Pagination, Space, Typography, Button } from "antd";
+import { Flex, Typography, Button, Select, Tooltip } from "antd";
+import { ArrowLeftOutlined, ArrowRightOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
+
+const MONO = '"SF Mono", "Monaco", "Inconsolata", "Fira Mono", "Droid Sans Mono", monospace';
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200].map((value) => ({ value, label: String(value) }));
 
 const PaginationBar = ({
   current = 1,
@@ -17,74 +22,77 @@ const PaginationBar = ({
 }) => {
   if (total === 0) return null;
 
+  const label = { fontSize: 12, color: "#8b8f9c" };
+
   return (
-    <div
+    <Flex
+      align="center"
+      justify="space-between"
+      wrap
+      gap={10}
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "8px 16px",
-        borderTop: "1px solid #eef1f6",
-        background: "#fafbfc",
-        flexWrap: "wrap",
-        gap: 8,
+        padding: "8px 14px",
+        borderTop: "1px solid #edece7",
+        background: "#faf9f6",
       }}
     >
-      <Space size={6} align="center">
-        <Button
-          type="text"
-          size="small"
-          disabled={loading || current <= 1 || !onPrev}
-          onClick={onPrev}
-          aria-label="Previous page"
+      <Flex align="center" gap={8}>
+        <Tooltip title="Previous page">
+          <Button
+            size="small"
+            type="text"
+            disabled={loading || current <= 1 || !onPrev}
+            onClick={onPrev}
+            icon={<ArrowLeftOutlined />}
+            aria-label="Previous page"
+          />
+        </Tooltip>
+        <Text
+          style={{
+            fontFamily: MONO,
+            fontSize: 12,
+            fontWeight: 550,
+            color: "#3f4761",
+            minWidth: 62,
+            textAlign: "center",
+          }}
         >
-          Previous
-        </Button>
-        <Text type="secondary" style={{ fontSize: 12.5 }}>
           Page {current}
         </Text>
-        <Button
-          type="text"
-          size="small"
-          disabled={loading || !hasNextPage || !onNext}
-          onClick={onNext}
-          aria-label="Next page"
-        >
-          Next
-        </Button>
-      </Space>
+        <Tooltip title="Next page">
+          <Button
+            size="small"
+            type="text"
+            disabled={loading || !hasNextPage || !onNext}
+            onClick={onNext}
+            icon={<ArrowRightOutlined />}
+            aria-label="Next page"
+          />
+        </Tooltip>
+      </Flex>
 
-      <Space align="center" size={12}>
+      <Flex align="center" gap={14} wrap>
         {showSizeChanger && (
-          <Space align="center" size={6}>
-            <Text type="secondary" style={{ fontSize: 12.5 }}>
-              Page size
-            </Text>
-            <Pagination
-              current={1}
-              total={total}
-              pageSize={pageSize}
-              onChange={() => {}}
-              onShowSizeChange={(_, size) => onPageSizeChange?.(size)}
-              showSizeChanger
-              showTotal={false}
-              showQuickJumper={false}
-              showLessItems={false}
+          <Flex align="center" gap={7}>
+            <Text style={label}>Rows</Text>
+            <Select
               size="small"
-              simple
-              itemRender={(page, type, originalElement) => {
-                if (type === "page") return null;
-                return originalElement;
-              }}
+              value={pageSize}
+              onChange={(size) => onPageSizeChange?.(size)}
+              options={PAGE_SIZE_OPTIONS}
+              disabled={loading}
+              style={{ width: 100 }}
             />
-          </Space>
+          </Flex>
         )}
-
-        <Text type="secondary" style={{ fontSize: 12.5 }}>
-          {total.toLocaleString()} total events
+        <Text style={label}>
+          <span style={{ fontFamily: MONO, color: "#3f4761", fontWeight: 550 }}>
+            {total.toLocaleString()}
+          </span>{" "}
+          events matched
         </Text>
-      </Space>
-    </div>
+      </Flex>
+    </Flex>
   );
 };
 

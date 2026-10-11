@@ -23,11 +23,34 @@ a {
   text-decoration: none;
 }
 
-/* Selected event row in the activity table */
-.ant-table-tbody > tr.selected-row > td {
-  background: #e8effd !important;
+::selection {
+  background: rgba(47, 84, 235, 0.16);
 }
 
-.ant-table-tbody > tr.selected-row:hover > td {
-  background: #dde8fc !important;
+/* Selected event row in the activity table (row background needs a cell-level selector) */
+.ant-table-tbody > tr.aa-row-selected > td {
+  background: #eef1fe !important;
+}
+
+.ant-table-tbody > tr.aa-row-selected:hover > td {
+  background: #e6ebfd !important;
+}
+
+/* Left accent marker on the selected row, tying it to the open detail drawer */
+.ant-table-tbody > tr.aa-row-selected > td:first-child {
+  box-shadow: inset 3px 0 0 #2f54eb;
+}
+
+.ant-table-tbody > tr.aa-row {
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

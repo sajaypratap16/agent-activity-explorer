@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useCallback, useState } from "react";
-import { Drawer, Descriptions, Tag, Flex, Button, Typography, Alert, Spin } from "antd";
+import { Drawer, Descriptions, Tag, Flex, Button, Typography, Alert, Skeleton } from "antd";
 import { ExclamationCircleOutlined } from "@ant-design/icons";
+import StatusBadge from "./StatusBadge";
+import { formatTimestamp, formatLatency } from "../lib/format";
 
 const { Text } = Typography;
 
@@ -21,56 +23,25 @@ const formatJson = (obj) => {
   return JSON.stringify(obj, null, 2);
 };
 
-const formatTimestamp = (iso) => {
-  if (!iso) return "—";
-  const date = new Date(iso);
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZoneName: "short",
-  });
-};
-
-const formatLatency = (ms) => {
-  if (ms === null || ms === undefined) return "—";
-  if (ms < 1000) return `${ms} ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`;
-  return `${(ms / 60000).toFixed(1)} min`;
-};
-
-const StatusTag = ({ status }) => {
-  const statusConfig = {
-    ok: { color: "success", text: "OK" },
-    blocked: { color: "warning", text: "Blocked" },
-    error: { color: "error", text: "Error" },
-  };
-  const config = statusConfig[status] || { color: "default", text: status };
-  return (
-    <Tag color={config.color} style={{ marginInlineEnd: 0, fontWeight: 500 }}>
-      {config.text}
-    </Tag>
-  );
-};
-
 const SectionLabel = ({ children, copyText }) => (
   <Flex align="center" justify="space-between" style={{ marginBottom: 8 }}>
     <Text
       style={{
-        fontSize: 11.5,
+        fontFamily: MONO,
+        fontSize: 10.5,
         fontWeight: 600,
         textTransform: "uppercase",
-        letterSpacing: "0.06em",
-        color: "#64748b",
+        letterSpacing: "0.1em",
+        color: "#6b7080",
       }}
     >
       {children}
     </Text>
     {copyText ? (
-      <Text copyable={{ text: copyText, tooltips: ["Copy", "Copied"] }} style={{ fontSize: 12, color: "#94a3b8" }} />
+      <Text
+        copyable={{ text: copyText, tooltips: ["Copy", "Copied"] }}
+        style={{ fontSize: 12, color: "#9aa0ae" }}
+      />
     ) : null}
   </Flex>
 );
@@ -79,16 +50,16 @@ const JsonPanel = ({ json }) => (
   <pre
     style={{
       margin: 0,
-      maxHeight: 320,
+      maxHeight: 300,
       overflow: "auto",
-      background: "#0f172a",
-      border: "1px solid #1e293b",
-      borderRadius: 6,
+      background: "#0a1230",
+      border: "1px solid rgba(120, 145, 210, 0.22)",
+      borderRadius: 8,
       padding: "12px 14px",
       fontSize: 12,
-      lineHeight: 1.65,
+      lineHeight: 1.7,
       fontFamily: MONO,
-      color: "#e2e8f0",
+      color: "#dbe4ff",
       whiteSpace: "pre-wrap",
       wordBreak: "break-word",
     }}
@@ -97,20 +68,26 @@ const JsonPanel = ({ json }) => (
   </pre>
 );
 
-const EventDetailDrawer = ({
-  open = false,
-  event = null,
-  loading = false,
-  error = null,
-  onClose,
-}) => {
+const MonoValue = ({ children, copyable, tone = "#1b2130", weight = 450 }) => (
+  <Text
+    copyable={copyable ? { text: copyable, tooltips: ["Copy", "Copied"] } : false}
+    style={{ fontFamily: MONO, fontSize: 12.5, color: tone, fontWeight: weight }}
+  >
+    {children}
+  </Text>
+);
+
+const EventDetailDrawer = ({ open = false, event = null, loading = false, error = null, onClose }) => {
   const [mounted, setMounted] = useState(false);
 
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === "Escape") {
-      onClose?.();
-    }
-  }, [onClose]);
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (e.key === "Escape") {
+        onClose?.();
+      }
+    },
+    [onClose],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -127,15 +104,32 @@ const EventDetailDrawer = ({
   if (!mounted || !open) return null;
 
   const headerTitle = (
-    <Flex vertical gap={2} style={{ paddingTop: 2 }}>
-      <Text strong style={{ fontSize: 15, color: "#0f172a", lineHeight: 1.3 }}>
-        Event details
+    <Flex vertical gap={3} style={{ paddingTop: 2, minWidth: 0 }}>
+      <Text
+        style={{
+          fontFamily: MONO,
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "#9aa0ae",
+        }}
+      >
+        Event detail
       </Text>
-      {event?.id ? (
-        <Text style={{ fontSize: 11.5, color: "#94a3b8", fontFamily: MONO, lineHeight: 1.3 }}>
-          {event.id}
-        </Text>
-      ) : null}
+      <Text
+        style={{
+          fontFamily: MONO,
+          fontSize: 12.5,
+          color: "#111726",
+          fontWeight: 550,
+          lineHeight: 1.3,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {event?.id || "Loading…"}
+      </Text>
     </Flex>
   );
 
@@ -144,23 +138,26 @@ const EventDetailDrawer = ({
     placement: "right",
     open,
     onClose,
-    size: 560,
+    size: 580,
     closable: true,
     keyboard: true,
+    extra: event ? <StatusBadge status={event.status} /> : null,
     styles: {
-      header: { padding: "12px 20px", borderBottom: "1px solid #eef1f6" },
-      body: { padding: 20 },
+      header: {
+        padding: "12px 20px",
+        borderBottom: "1px solid #edece7",
+        background: "#ffffff",
+      },
+      body: { padding: "18px 20px 24px", background: "#ffffff" },
     },
   };
 
   if (loading) {
     return (
-      <Drawer {...drawerProps}>
-        <Flex vertical align="center" justify="center" gap={10} style={{ minHeight: 240 }}>
-          <Spin />
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            Loading event…
-          </Text>
+      <Drawer {...drawerProps} extra={null}>
+        <Flex vertical gap={18}>
+          <Skeleton active title={{ width: "40%" }} paragraph={{ rows: 4 }} />
+          <Skeleton active title={{ width: "28%" }} paragraph={{ rows: 3 }} />
         </Flex>
       </Drawer>
     );
@@ -168,14 +165,18 @@ const EventDetailDrawer = ({
 
   if (error) {
     return (
-      <Drawer {...drawerProps}>
+      <Drawer {...drawerProps} extra={null}>
         <Alert
           title="Failed to load event"
           description={error.message || "Unknown error"}
           type="error"
           showIcon
           icon={<ExclamationCircleOutlined />}
-          action={<Button size="small" onClick={onClose}>Close</Button>}
+          action={
+            <Button size="small" onClick={onClose}>
+              Close
+            </Button>
+          }
         />
       </Drawer>
     );
@@ -183,13 +184,17 @@ const EventDetailDrawer = ({
 
   if (!event) {
     return (
-      <Drawer {...drawerProps}>
+      <Drawer {...drawerProps} extra={null}>
         <Alert
           title="Event not found"
           description="The requested event could not be found or has been removed."
           type="warning"
           showIcon
-          action={<Button size="small" onClick={onClose}>Close</Button>}
+          action={
+            <Button size="small" onClick={onClose}>
+              Close
+            </Button>
+          }
         />
       </Drawer>
     );
@@ -201,39 +206,21 @@ const EventDetailDrawer = ({
     metaItems.push({
       key: "id",
       label: "Event ID",
-      children: (
-        <Text
-          copyable={{ text: event.id, tooltips: ["Copy", "Copied"] }}
-          style={{ fontFamily: MONO, fontSize: 12.5, color: "#0f172a" }}
-        >
-          {event.id}
-        </Text>
-      ),
+      children: <MonoValue copyable={event.id}>{event.id}</MonoValue>,
     });
   }
 
   metaItems.push({
     key: "timestamp",
     label: "Timestamp",
-    children: (
-      <Text style={{ fontFamily: MONO, fontSize: 12.5, color: "#334155" }}>
-        {formatTimestamp(event.timestamp)}
-      </Text>
-    ),
+    children: <MonoValue tone="#3f4761">{formatTimestamp(event.timestamp)}</MonoValue>,
   });
 
   if (event.agent) {
     metaItems.push({
       key: "agent",
       label: "Agent",
-      children: (
-        <Text
-          copyable={{ text: event.agent, tooltips: ["Copy", "Copied"] }}
-          style={{ fontWeight: 500, fontSize: 12.5, color: "#0f172a" }}
-        >
-          {event.agent}
-        </Text>
-      ),
+      children: <MonoValue weight={550}>{event.agent}</MonoValue>,
     });
   }
 
@@ -241,31 +228,20 @@ const EventDetailDrawer = ({
     metaItems.push({
       key: "tool",
       label: "Tool",
-      children: (
-        <Text
-          copyable={{ text: event.tool, tooltips: ["Copy", "Copied"] }}
-          style={{ fontFamily: MONO, fontSize: 12.5, color: "#334155" }}
-        >
-          {event.tool}
-        </Text>
-      ),
+      children: <MonoValue tone="#3f4761">{event.tool}</MonoValue>,
     });
   }
 
   metaItems.push({
     key: "status",
     label: "Status",
-    children: <StatusTag status={event.status} />,
+    children: <StatusBadge status={event.status} />,
   });
 
   metaItems.push({
     key: "latency",
     label: "Latency",
-    children: (
-      <Text style={{ fontFamily: MONO, fontSize: 12.5, color: "#334155" }}>
-        {formatLatency(event.latencyMs)}
-      </Text>
-    ),
+    children: <MonoValue tone="#3f4761">{formatLatency(event.latencyMs)}</MonoValue>,
   });
 
   if (event.workspace) {
@@ -284,11 +260,18 @@ const EventDetailDrawer = ({
           <Descriptions
             column={1}
             size="small"
+            bordered
             colon={false}
             items={metaItems}
             styles={{
-              label: { color: "#64748b", fontSize: 12.5, paddingBlock: 6 },
-              content: { fontSize: 12.5, paddingBlock: 6 },
+              label: {
+                color: "#6b7080",
+                fontSize: 12,
+                paddingBlock: 7,
+                background: "#faf9f6",
+                width: 116,
+              },
+              content: { fontSize: 12.5, paddingBlock: 7 },
             }}
           />
         </Flex>
@@ -300,7 +283,7 @@ const EventDetailDrawer = ({
           {event.args != null ? (
             <JsonPanel json={formatJson(event.args)} />
           ) : (
-            <Text type="secondary" style={{ fontSize: 12.5 }}>
+            <Text style={{ color: "#9aa0ae", fontSize: 12.5 }}>
               No input arguments recorded for this event.
             </Text>
           )}
@@ -318,7 +301,17 @@ const EventDetailDrawer = ({
             <SectionLabel>Policy matches</SectionLabel>
             <Flex wrap gap={6}>
               {event.policyMatches.map((policy, i) => (
-                <Tag key={i} color="blue" style={{ marginInlineEnd: 0 }}>
+                <Tag
+                  key={i}
+                  style={{
+                    marginInlineEnd: 0,
+                    background: "#eef1fe",
+                    border: "1px solid #d5ddfb",
+                    color: "#2743c4",
+                    fontFamily: MONO,
+                    fontSize: 11.5,
+                  }}
+                >
                   {policy}
                 </Tag>
               ))}
