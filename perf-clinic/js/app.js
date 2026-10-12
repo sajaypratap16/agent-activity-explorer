@@ -13,6 +13,22 @@ const scrollContext = document.getElementById('scroll-context');
 
 const minCardHeight = 220;
 
+// Prepare immutable lookup data once instead of rebuilding it on every interaction.
+const sortedActivity = window.ACTIVITY.slice().sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+const searchableActivity = sortedActivity.map((event) => ({
+  event,
+  text: [event.id, event.timestamp, event.agent, event.tool, event.status, event.latencyMs, event.summary]
+    .join(' ').toLowerCase(),
+}));
+const callsByMinute = new Map();
+for (const event of window.ACTIVITY) {
+  const minute = event.timestamp.slice(11, 16);
+  callsByMinute.set(minute, (callsByMinute.get(minute) || 0) + 1);
+}
+let scrollFrame = 0;
+let tickerInterval = null;
+let tickerKeyHandler = null;
+
 function escapeHtml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -51,17 +67,20 @@ function renderAgents() {
 }
 
 function equalizeCardHeights() {
-  const cards = grid.querySelectorAll('.agent-card');
+  const cards = Array.from(grid.querySelectorAll('.agent-card'));
+  // Reset first, then measure once per card and group cards by their visual row.
+  cards.forEach((card) => { card.style.height = ''; });
+  const rows = new Map();
   cards.forEach((card) => {
-    card.style.height = '';
-    const rowTop = card.offsetTop;
-    let tallest = Math.max(card.offsetHeight, minCardHeight);
-    cards.forEach((other) => {
-      if (other.offsetTop === rowTop) {
-        tallest = Math.max(tallest, other.offsetHeight);
-      }
-    });
-    card.style.height = tallest + 'px';
+    const top = card.offsetTop;
+    const height = Math.max(card.offsetHeight, minCardHeight);
+    const row = rows.get(top) || [];
+    row.push({ card, height });
+    rows.set(top, row);
+  });
+  rows.forEach((row) => {
+    const height = Math.max(...row.map((item) => item.height));
+    row.forEach(({ card }) => { card.style.height = height + 'px'; });
   });
 }
 
@@ -75,15 +94,14 @@ function rememberViewed(items) {
     if (!viewed.includes(item.id)) {
       viewed.push(item.id);
     }
-    localStorage.setItem(storageKey, JSON.stringify(viewed));
   }
+  if (items.length) localStorage.setItem(storageKey, JSON.stringify(viewed));
 }
 
 function search(query) {
   const needle = query.trim().toLowerCase();
-  return window.ACTIVITY
-    .filter((event) => JSON.stringify(event).toLowerCase().includes(needle))
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  if (!needle) return sortedActivity;
+  return searchableActivity.filter((item) => item.text.includes(needle)).map((item) => item.event);
 }
 
 function renderResults(query) {
@@ -105,22 +123,14 @@ function renderResults(query) {
       '</li>'
     );
   }).join('');
-  fitSummaries();
   rememberViewed(page);
 }
 
-function fitSummaries() {
-  resultsList.querySelectorAll('.result-summary').forEach((cell) => {
-    let size = 14;
-    cell.style.fontSize = size + 'px';
-    while (cell.scrollWidth > cell.clientWidth && size > 11) {
-      size -= 0.5;
-      cell.style.fontSize = size + 'px';
-    }
-  });
-}
 
 function onScroll() {
+  if (scrollFrame) return;
+  scrollFrame = requestAnimationFrame(() => {
+  scrollFrame = 0;
   const scrolled = window.scrollY;
   const max = document.documentElement.scrollHeight - window.innerHeight;
   progress.style.width = (max > 0 ? (scrolled / max) * 100 : 0) + '%';
@@ -137,11 +147,12 @@ function onScroll() {
   const focused = resultsList.querySelector('.in-focus');
   if (focused) {
     const minute = focused.dataset.minute;
-    const sameMinute = window.ACTIVITY.filter((event) => new Date(event.timestamp).toISOString().slice(11, 16) === minute).length;
+    const sameMinute = callsByMinute.get(minute) || 0;
     scrollContext.textContent = minute + ' UTC · ' + sameMinute + ' calls that minute';
   } else {
     scrollContext.textContent = '';
   }
+  });
 }
 
 function hidePreview() {
@@ -189,7 +200,7 @@ function openTicker() {
   tickerPanel = panel;
   const list = panel.querySelector('.ticker-list');
 
-  setInterval(() => {
+  tickerInterval = setInterval(() => {
     const event = window.ACTIVITY[Math.floor(Math.random() * window.ACTIVITY.length)];
     list.prepend(tickerRow(event));
     while (list.children.length > tickerVisibleRows) {
@@ -198,9 +209,10 @@ function openTicker() {
   }, tickerIntervalMs);
 
   window.addEventListener('resize', positionTicker);
-  window.addEventListener('keydown', (event) => {
+  tickerKeyHandler = (event) => {
     if (event.key === 'Escape') closeTicker();
-  });
+  };
+  window.addEventListener('keydown', tickerKeyHandler);
   positionTicker();
   tickerToggle.setAttribute('aria-pressed', 'true');
   tickerToggle.textContent = 'Hide live calls';
@@ -217,7 +229,6 @@ function closeTicker() {
 searchInput.addEventListener('input', () => renderResults(searchInput.value));
 window.addEventListener('scroll', onScroll);
 window.addEventListener('resize', equalizeCardHeights);
-window.addEventListener('resize', fitSummaries);
 resultsList.addEventListener('mousemove', showPreview);
 resultsList.addEventListener('mouseleave', hidePreview);
 resultsList.addEventListener('wheel', hidePreview);
